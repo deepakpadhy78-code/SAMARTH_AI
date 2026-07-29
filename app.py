@@ -14,6 +14,7 @@ load_dotenv()
 genai.configure(
     api_key=os.getenv("AQ.Ab8RN6Lz361zvr33t9VDBJem1tNYRWXq9kOYnc-4jAvhEzn05w")
 )
+)
 
 model = genai.GenerativeModel("gemini-2.5-flash")
 
@@ -109,5 +110,10 @@ Example
         }),500
 
 
-if __name__=="__main__":
-    app.run(host="0.0.0.0",port=5000)
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(
+        host="0.0.0.0",
+        port=port,
+        debug=False
+    )
