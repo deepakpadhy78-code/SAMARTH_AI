@@ -93,12 +93,12 @@ Return ONLY JSON.
             and result["safetyShoes"]
         )
 
-        return jsonify({
+               return jsonify({
             "success": True,
             "result": result
         })
 
-        except Exception as e:
+    except Exception as e:
         import traceback
         traceback.print_exc()
 
