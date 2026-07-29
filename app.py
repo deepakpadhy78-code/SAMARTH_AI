@@ -49,9 +49,20 @@ def verify_ppe():
 
         image = request.files["image"]
 
-        image_bytes = image.read()
+image_bytes = image.read()
 
-        image_base64 = base64.b64encode(image_bytes).decode("utf-8")
+# Open image
+img = Image.open(io.BytesIO(image_bytes))
+
+# Resize image (reduces payload size)
+img.thumbnail((1024, 1024))
+
+# Save compressed image
+buffer = io.BytesIO()
+img.save(buffer, format="JPEG", quality=85)
+
+# Convert compressed image to Base64
+image_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
 
         prompt = """
 You are an Electrical PPE Inspector.
