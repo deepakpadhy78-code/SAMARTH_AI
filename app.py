@@ -14,7 +14,6 @@ load_dotenv()
 genai.configure(
     api_key=os.getenv("AQ.Ab8RN6Lz361zvr33t9VDBJem1tNYRWXq9kOYnc-4jAvhEzn05w")
 )
-)
 
 model = genai.GenerativeModel("gemini-2.5-flash")
 
