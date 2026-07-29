@@ -36,6 +36,20 @@ def extract_json(text):
 @app.route("/")
 def home():
     return "SAMARTH AI PPE SERVER RUNNING"
+@app.route("/test")
+def test():
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents="Reply with only the word OK"
+        )
+
+        return response.text
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return str(e), 500
 
 
 @app.route("/verifyPPE", methods=["POST"])
