@@ -98,7 +98,9 @@ Return ONLY JSON.
             "result": result
         })
 
-    except Exception as e:
+        except Exception as e:
+        import traceback
+        traceback.print_exc()
 
         return jsonify({
             "success": False,
