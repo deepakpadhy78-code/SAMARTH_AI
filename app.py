@@ -1,26 +1,24 @@
 from flask import Flask, request, jsonify
-from google import genai
+from openai import OpenAI
 from dotenv import load_dotenv
 from PIL import Image
 import os
 import io
 import json
 import re
-import traceback
+import base64
 
-# Load environment variables
 load_dotenv()
 
-# Gemini Client
-client = genai.Client(
-    api_key=os.getenv("GEMINI_API_KEY")
+client = OpenAI(
+    api_key=os.getenv("SAMBANOVA_API_KEY"),
+    base_url="https://api.sambanova.ai/v1"
 )
 
 app = Flask(__name__)
 
 
 def extract_json(text):
-    """Extract JSON object from Gemini response"""
     text = re.sub(r"```json", "", text)
     text = re.sub(r"```", "", text)
 
@@ -28,48 +26,37 @@ def extract_json(text):
     end = text.rfind("}")
 
     if start == -1 or end == -1:
-        raise Exception("Gemini did not return valid JSON.")
+        raise Exception("No JSON found.")
 
-    return text[start:end + 1]
+    return text[start:end+1]
 
 
 @app.route("/")
 def home():
     return "SAMARTH AI PPE SERVER RUNNING"
-@app.route("/test")
-def test():
-    try:
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents="Reply with only the word OK"
-        )
-
-        return response.text
-
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return str(e), 500
 
 
 @app.route("/verifyPPE", methods=["POST"])
 def verify_ppe():
+
     try:
 
         if "image" not in request.files:
             return jsonify({
                 "success": False,
-                "message": "No image uploaded."
+                "message": "No image uploaded"
             }), 400
 
-        image_file = request.files["image"]
+        image = request.files["image"]
 
-        img = Image.open(io.BytesIO(image_file.read()))
+        image_bytes = image.read()
+
+        image_base64 = base64.b64encode(image_bytes).decode("utf-8")
 
         prompt = """
 You are an Electrical PPE Inspector.
 
-Check ONLY these PPE items:
+Check ONLY these PPE items.
 
 1. Arc Flash Suit
 2. Arc Flash Face Shield
@@ -78,36 +65,52 @@ Check ONLY these PPE items:
 
 Rules:
 - If no person is visible -> false
-- If PPE is not clearly visible -> false
+- If PPE not visible -> false
 - Never guess.
-- Return ONLY JSON.
 
-Example:
+Return ONLY JSON.
 
 {
-  "arcFlashSuit": true,
-  "faceShield": true,
-  "electricalGloves": true,
-  "safetyShoes": true
+ "arcFlashSuit": true,
+ "faceShield": true,
+ "electricalGloves": true,
+ "safetyShoes": true
 }
 """
 
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=[prompt, img]
+        response = client.chat.completions.create(
+            model="Gemma-3-27B-Instruct",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": prompt
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{image_base64}"
+                            }
+                        }
+                    ]
+                }
+            ],
+            temperature=0
         )
 
-        answer = response.text
+        answer = response.choices[0].message.content
 
-        clean_json = extract_json(answer)
+        clean = extract_json(answer)
 
-        result = json.loads(clean_json)
+        result = json.loads(clean)
 
         result["overallPass"] = (
-            result.get("arcFlashSuit", False)
-            and result.get("faceShield", False)
-            and result.get("electricalGloves", False)
-            and result.get("safetyShoes", False)
+            result["arcFlashSuit"]
+            and result["faceShield"]
+            and result["electricalGloves"]
+            and result["safetyShoes"]
         )
 
         return jsonify({
@@ -116,8 +119,6 @@ Example:
         })
 
     except Exception as e:
-        traceback.print_exc()
-
         return jsonify({
             "success": False,
             "message": str(e)
