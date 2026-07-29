@@ -1,14 +1,17 @@
 from flask import Flask, request, jsonify
 from google import genai
-from PIL import Image
 from dotenv import load_dotenv
+from PIL import Image
 import os
 import io
 import json
 import re
+import traceback
 
+# Load environment variables
 load_dotenv()
 
+# Gemini Client
 client = genai.Client(
     api_key=os.getenv("GEMINI_API_KEY")
 )
@@ -17,6 +20,7 @@ app = Flask(__name__)
 
 
 def extract_json(text):
+    """Extract JSON object from Gemini response"""
     text = re.sub(r"```json", "", text)
     text = re.sub(r"```", "", text)
 
@@ -24,7 +28,7 @@ def extract_json(text):
     end = text.rfind("}")
 
     if start == -1 or end == -1:
-        raise Exception("No JSON returned by Gemini")
+        raise Exception("Gemini did not return valid JSON.")
 
     return text[start:end + 1]
 
@@ -36,23 +40,22 @@ def home():
 
 @app.route("/verifyPPE", methods=["POST"])
 def verify_ppe():
-
     try:
 
         if "image" not in request.files:
             return jsonify({
                 "success": False,
-                "message": "No image uploaded"
+                "message": "No image uploaded."
             }), 400
 
-        image = request.files["image"]
+        image_file = request.files["image"]
 
-        img = Image.open(io.BytesIO(image.read()))
+        img = Image.open(io.BytesIO(image_file.read()))
 
         prompt = """
 You are an Electrical PPE Inspector.
 
-Check ONLY these PPE items.
+Check ONLY these PPE items:
 
 1. Arc Flash Suit
 2. Arc Flash Face Shield
@@ -60,12 +63,12 @@ Check ONLY these PPE items.
 4. Safety Shoes
 
 Rules:
-
 - If no person is visible -> false
-- If any PPE item is not clearly visible -> false
+- If PPE is not clearly visible -> false
 - Never guess.
+- Return ONLY JSON.
 
-Return ONLY JSON.
+Example:
 
 {
   "arcFlashSuit": true,
@@ -82,24 +85,23 @@ Return ONLY JSON.
 
         answer = response.text
 
-        clean = extract_json(answer)
+        clean_json = extract_json(answer)
 
-        result = json.loads(clean)
+        result = json.loads(clean_json)
 
         result["overallPass"] = (
-            result["arcFlashSuit"]
-            and result["faceShield"]
-            and result["electricalGloves"]
-            and result["safetyShoes"]
+            result.get("arcFlashSuit", False)
+            and result.get("faceShield", False)
+            and result.get("electricalGloves", False)
+            and result.get("safetyShoes", False)
         )
 
-               return jsonify({
+        return jsonify({
             "success": True,
             "result": result
         })
 
     except Exception as e:
-        import traceback
         traceback.print_exc()
 
         return jsonify({
