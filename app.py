@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
-import google.generativeai as genai
-from dotenv import load_dotenv
+from google import genai
 from PIL import Image
+from dotenv import load_dotenv
 import os
 import io
 import json
@@ -9,13 +9,9 @@ import re
 
 load_dotenv()
 
-load_dotenv()
-
-genai.configure(
+client = genai.Client(
     api_key=os.getenv("AQ.Ab8RN6Lz361zvr33t9VDBJem1tNYRWXq9kOYnc-4jAvhEzn05w")
 )
-
-model = genai.GenerativeModel("gemini-2.5-flash")
 
 app = Flask(__name__)
 
@@ -23,9 +19,14 @@ app = Flask(__name__)
 def extract_json(text):
     text = re.sub(r"```json", "", text)
     text = re.sub(r"```", "", text)
+
     start = text.find("{")
     end = text.rfind("}")
-    return text[start:end+1]
+
+    if start == -1 or end == -1:
+        raise Exception("No JSON returned by Gemini")
+
+    return text[start:end + 1]
 
 
 @app.route("/")
@@ -42,13 +43,13 @@ def verify_ppe():
             return jsonify({
                 "success": False,
                 "message": "No image uploaded"
-            }),400
+            }), 400
 
-        image=request.files["image"]
+        image = request.files["image"]
 
-        img=Image.open(io.BytesIO(image.read()))
+        img = Image.open(io.BytesIO(image.read()))
 
-        prompt="""
+        prompt = """
 You are an Electrical PPE Inspector.
 
 Check ONLY these PPE items.
@@ -60,59 +61,51 @@ Check ONLY these PPE items.
 
 Rules:
 
-If no person -> false
-
-If PPE not visible -> false
-
-Never guess.
+- If no person is visible -> false
+- If any PPE item is not clearly visible -> false
+- Never guess.
 
 Return ONLY JSON.
 
-Example
-
 {
- "arcFlashSuit": true,
- "faceShield": true,
- "electricalGloves": true,
- "safetyShoes": true
+  "arcFlashSuit": true,
+  "faceShield": true,
+  "electricalGloves": true,
+  "safetyShoes": true
 }
 """
 
-        response=model.generate_content([prompt,img])
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=[prompt, img]
+        )
 
-        answer=response.text
+        answer = response.text
 
-        clean=extract_json(answer)
+        clean = extract_json(answer)
 
-        result=json.loads(clean)
+        result = json.loads(clean)
 
-        result["overallPass"]=(
+        result["overallPass"] = (
             result["arcFlashSuit"]
-            and
-            result["faceShield"]
-            and
-            result["electricalGloves"]
-            and
-            result["safetyShoes"]
+            and result["faceShield"]
+            and result["electricalGloves"]
+            and result["safetyShoes"]
         )
 
         return jsonify({
-            "success":True,
-            "result":result
+            "success": True,
+            "result": result
         })
 
     except Exception as e:
 
         return jsonify({
-            "success":False,
-            "message":str(e)
-        }),500
+            "success": False,
+            "message": str(e)
+        }), 500
 
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    app.run(
-        host="0.0.0.0",
-        port=port,
-        debug=False
-    )
+    app.run(host="0.0.0.0", port=port)
