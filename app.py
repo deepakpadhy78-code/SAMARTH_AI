@@ -38,7 +38,6 @@ def home():
 
 @app.route("/verifyPPE", methods=["POST"])
 def verify_ppe():
-
     try:
 
         if "image" not in request.files:
@@ -49,20 +48,18 @@ def verify_ppe():
 
         image = request.files["image"]
 
-image_bytes = image.read()
+        # Read image
+        image_bytes = image.read()
 
-# Open image
-img = Image.open(io.BytesIO(image_bytes))
+        # Compress image
+        img = Image.open(io.BytesIO(image_bytes))
+        img = img.convert("RGB")
+        img.thumbnail((1024, 1024))
 
-# Resize image (reduces payload size)
-img.thumbnail((1024, 1024))
+        buffer = io.BytesIO()
+        img.save(buffer, format="JPEG", quality=80)
 
-# Save compressed image
-buffer = io.BytesIO()
-img.save(buffer, format="JPEG", quality=85)
-
-# Convert compressed image to Base64
-image_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+        image_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
 
         prompt = """
 You are an Electrical PPE Inspector.
@@ -74,18 +71,13 @@ Check ONLY these PPE items.
 3. Electrical Gloves
 4. Safety Shoes
 
-Rules:
-- If no person is visible -> false
-- If PPE not visible -> false
-- Never guess.
-
-Return ONLY JSON.
+Return ONLY valid JSON.
 
 {
- "arcFlashSuit": true,
- "faceShield": true,
- "electricalGloves": true,
- "safetyShoes": true
+  "arcFlashSuit": true,
+  "faceShield": true,
+  "electricalGloves": true,
+  "safetyShoes": true
 }
 """
 
@@ -108,7 +100,8 @@ Return ONLY JSON.
                     ]
                 }
             ],
-            temperature=0
+            temperature=0,
+            max_tokens=200
         )
 
         answer = response.choices[0].message.content
@@ -134,8 +127,3 @@ Return ONLY JSON.
             "success": False,
             "message": str(e)
         }), 500
-
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
