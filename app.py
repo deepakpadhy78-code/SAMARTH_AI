@@ -79,7 +79,7 @@ Return ONLY JSON.
 """
 
         response = client.chat.completions.create(
-            model="Gemma-3-27B-Instruct",
+           model="Meta-Llama-3.3-70B-Instruct",
             messages=[
                 {
                     "role": "user",
